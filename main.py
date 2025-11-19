@@ -262,7 +262,7 @@ class Image:
         pydirectinput.moveTo(point.x, point.y)
         await asyncio.sleep(0.1)
         pydirectinput.mouseDown()
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(0.05)
         pydirectinput.mouseUp()
 
     async def return_origin(self):
@@ -294,7 +294,7 @@ class Image:
         dy = abs_point.y - origin.y
 
         move_x = int(origin.x + (dx * suppression) / MOUSE_MOVE_DIVISOR)
-        move_y = int(origin.y + dy / MOUSE_MOVE_DIVISOR)
+        move_y = int(origin.y + dy / 1.9)
 
         return Point(move_x, move_y)
 
@@ -302,7 +302,21 @@ class Image:
         return self._origin is not None and self._window is not None
 
     async def sleep(self):
-        await asyncio.sleep(self.LOOP_WAIT_TIME)
+        CLICK_INTERVAL = 0.5
+
+        if not self.is_ready():
+            await asyncio.sleep(self.LOOP_WAIT_TIME)
+            return
+
+        end_time = asyncio.get_event_loop().time() + self.LOOP_WAIT_TIME
+
+        while asyncio.get_event_loop().time() < end_time:
+            pydirectinput.mouseDown()
+            await asyncio.sleep(0.05)
+            pydirectinput.mouseUp()
+
+            await asyncio.sleep(CLICK_INTERVAL)
+
 
 if __name__ == "__main__":
     asyncio.run(Image().run())
