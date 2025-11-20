@@ -1,6 +1,7 @@
 import cv2
-import logging
+import math
 import random
+import logging
 import asyncio
 import keyboard
 import pyautogui
@@ -17,10 +18,28 @@ from pygetwindow._pygetwindow_win import Win32Window
 logging.basicConfig(level=logging.INFO)
 
 
-@dataclass
+@dataclass(frozen=True)
 class Point:
     x: int
     y: int
+
+    def __add__(self, other: "Point") -> "Point":
+        return Point(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other: "Point") -> "Point":
+        return Point(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, factor: float) -> "Point":
+        return Point(int(self.x * factor), int(self.y * factor))
+
+    def offset(self, dx: int = 0, dy: int = 0) -> "Point":
+        return Point(self.x + dx, self.y + dy)
+
+    def distance_to(self, other: "Point") -> float:
+        return math.hypot(self.x - other.x, self.y - other.y)
+
+    def move_to(self):
+        pydirectinput.moveTo(self.x, self.y)
 
 
 class ContourClickMode(IntEnum):
@@ -31,117 +50,154 @@ class ContourClickMode(IntEnum):
 class Image:
     THRESHOLD_VALUE: Final[int] = 30
     LOOP_WAIT_TIME: Final[int] = 5
-    MIN_CONTOUR_AREA: Final[int] = 100
+    MIN_CONTOUR_AREA: Final[int] = 200
     MIN_CLICK_DISTANCE: Final[int] = 20
     MAX_CLICKS_PER_LOOP: Final[int] = 10
+    RANDOM_CLICKS_PER_CONTOUR: Final[int] = 3
+
+    WINDOW_SIZE: Final[tuple[int, int]] = (1024, 768)
+
+    ENABLE_AVOID_CLOSE_CLICK: Final[bool] = True
+    DRY_RUN: Final[bool] = False
 
     TERMINATE_KEY: Final[str] = "esc"
-    UPDATE_WINDOW_KEY: Final[str] = "f6"
-    UPDATE_ORIGIN_KEY: Final[str] = "f7"
-    RESET_KEY: Final[str] = "f8"
+    SET_WINDOW_KEY: Final[str] = "f5"
+    TOGGLE_ENABLE_KEY: Final[str] = "f6"
 
-    def __init__(self, contour_click_mode: ContourClickMode = ContourClickMode.CENTER):
-        self._task: asyncio.Task = None
+    def __init__(self, contour_click_mode: ContourClickMode = ContourClickMode.RANDOM):
+        self._main_task: asyncio.Task = None
+        self._auto_click_task: asyncio.Task = None
+        self._click_lock = asyncio.Lock()
+        self._running: bool = False
 
         self._window: Optional[Win32Window] = None
-        self._origin: Optional[Point] = None
+        self._original_size: Optional[tuple[int, int]] = None
+
+        self._mask: Optional[np.ndarray] = self._load_mask("mask.png")
 
         width, height = pyautogui.size()
-        logging.info(f"Screen size : {width}x{height}")
-
         self._screen_width = width
         self._screen_height = height
+        logging.debug(f"Screen size : {width}x{height}")
 
         self._contour_click_mode = contour_click_mode
 
-    async def keyboard_monitor_task(self):
-        while True:
-            if keyboard.is_pressed(self.TERMINATE_KEY):
-                logging.info("Terminate key is pressed. Stopping...")
-                if self._task:
-                    self._task.cancel()
-                break
+        keyboard.on_press_key(self.TERMINATE_KEY, self.terminate)
+        keyboard.on_press_key(self.SET_WINDOW_KEY, self.set_window)
+        keyboard.on_press_key(self.TOGGLE_ENABLE_KEY, self.toggle_run)
 
-            if keyboard.is_pressed(self.UPDATE_WINDOW_KEY):
-                logging.info("Update target window")
-                self.update_window()
+    def terminate(self, _):
+        logging.info("ESC pressed: Emergency stop")
 
-            if keyboard.is_pressed(self.UPDATE_ORIGIN_KEY):
-                logging.info("Update mouse origin")
-                self.update_origin()
+        self._running = False
 
-            if keyboard.is_pressed(self.RESET_KEY):
-                logging.info("Reset window and origin")
-                self._origin = None
-                self._window = None
+        if self._main_task:
+            self._main_task.cancel()
+        if self._auto_click_task:
+            self._auto_click_task.cancel()
 
-            await asyncio.sleep(0.1)
-
-    def update_window(self) -> Win32Window:
+    def set_window(self, _):
+        if self._running:
+            logging.warning("Ignored set window (now running)")
+            return
         window = pygetwindow.getActiveWindow()
-        if not window:
+        if window is None:
             logging.warning("Active window not found.")
+            return
 
+        self.restore_window_size()
         self._window = window
+        self._original_size = (window.width, window.height)
 
+        window.resizeTo(*self.WINDOW_SIZE)
         logging.info(f"Window : {window}")
 
-    def update_origin(self):
-        p = pyautogui.position()
-        self._origin = Point(p.x, p.y)
-        logging.info(f"Origin : {self._origin.x} {self._origin.y}")
+    def toggle_run(self, _):
+        if self._running:
+            self._running = False
+            logging.info("Stop")
+            return
+
+        if self._window is None:
+            logging.warning("Window is not set.")
+            return
+
+        self._running = True
+
+    def restore_window_size(self):
+        if self._window is None or self._original_size is None:
+            return
+
+        try:
+            w, h = self._original_size
+            self._window.resizeTo(w, h)
+            logging.info("Window size restored.")
+        except Exception as e:
+            logging.warning(f"Restore failed: {e}")
+
+    async def run(self):
+        self._main_task = asyncio.create_task(self.main_loop())
+        self._auto_click_task = asyncio.create_task(self.auto_click_loop())
+        await asyncio.gather(self._main_task, self._auto_click_task)
 
     async def main_loop(self):
         try:
             while True:
-                await self.loop_step()
+                if self._running:
+                    await self.loop_step()
+                    await asyncio.sleep(self.LOOP_WAIT_TIME)
         except asyncio.CancelledError:
             pass
         finally:
+            pydirectinput.mouseUp()
             pydirectinput.keyUp("tab")
+            self.restore_window_size()
+
+    async def auto_click_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(0.20)
+                if self._running:
+                    if not self._click_lock.locked():
+                        pydirectinput.mouseDown()
+                        await asyncio.sleep(0.05)
+                        pydirectinput.mouseUp()
+
+        except asyncio.CancelledError:
+            pass
 
     async def loop_step(self):
-        if not self.is_ready():
-            return await self.sleep()
-
         prev_img, curr_img = await self.capture_window()
         if prev_img is None or curr_img is None:
-            return await self.sleep()
+            return
 
         contours = self.get_contours(prev_img, curr_img)
         if not contours:
-            return await self.sleep()
+            return
 
         points = self.extract_click_points(contours)
         if not points:
-            return await self.sleep()
+            return
 
-        result = await self.process_clicks(points)
+        await self.process_clicks(points)
 
-        self.draw_debug(contours, points, result, curr_img)
-
-        return await self.sleep()
+        self.draw_debug(contours, points, curr_img)
 
     async def capture_window(self):
-        try:
-            img1 = pyautogui.screenshot(
-                region=[
-                    self._window.left,
-                    self._window.top,
-                    self._window.width,
-                    self._window.height,
-                ]
-            )
-            await asyncio.sleep(0.1)
+        if self._window is None:
+            return
 
-            img2 = pyautogui.screenshot(
-                region=[
-                    self._window.left,
-                    self._window.top,
-                    self._window.width,
-                    self._window.height,
-                ]
-            )
+        region = [
+            self._window.left,
+            self._window.top,
+            self._window.width,
+            self._window.height,
+        ]
+
+        try:
+            img1 = pyautogui.screenshot(region=region)
+            await asyncio.sleep(0.1)
+            img2 = pyautogui.screenshot(region=region)
         except Exception as e:
             logging.warning(f"Screenshot failed: {e}")
             return None, None
@@ -156,6 +212,10 @@ class Image:
         gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
         _, thresh = cv2.threshold(gray, self.THRESHOLD_VALUE, 255, cv2.THRESH_BINARY)
         dilated = cv2.dilate(thresh, None, iterations=2)
+
+        if self._mask is not None:
+            dilated = cv2.bitwise_and(dilated, self._mask)
+
         contours, _ = cv2.findContours(
             dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
         )
@@ -173,24 +233,36 @@ class Image:
 
     def extract_click_points(self, contours) -> list[Point]:
         points: list[Point] = []
+        mode = self._contour_click_mode
 
         for contour in contours:
             if len(points) >= self.MAX_CLICKS_PER_LOOP:
                 return points
 
-            point = self.get_point(contour)
-            if point is None:
+            if mode == ContourClickMode.RANDOM:
+                candidates = (
+                    self.get_point(contour, mode)
+                    for _ in range(self.RANDOM_CLICKS_PER_CONTOUR)
+                )
+            elif mode == ContourClickMode.CENTER:
+                candidates = (self.get_point(contour, mode),)
+            else:
                 continue
 
-            if self.check_distance(point, points):
-                continue
-
-            points.append(point)
+            for point in candidates:
+                if point is None:
+                    continue
+                if self.ENABLE_AVOID_CLOSE_CLICK:
+                    if any(
+                        point.distance_to(p) < self.MIN_CLICK_DISTANCE for p in points
+                    ):
+                        continue
+                points.append(point)
 
         return points
 
-    def get_point(self, contour) -> Optional[Point]:
-        match self._contour_click_mode:
+    def get_point(self, contour, mode: ContourClickMode) -> Optional[Point]:
+        match mode:
             case ContourClickMode.RANDOM:
                 bx, by, bw, bh = cv2.boundingRect(contour)
 
@@ -210,25 +282,52 @@ class Image:
 
         return None
 
-    async def process_clicks(self, points: list[Point]) -> list[Point]:
-        result = []
+    async def process_clicks(self, points: list[Point]):
+        async with self._click_lock:
+            pydirectinput.keyDown("tab")
+            await asyncio.sleep(0.2)
 
-        pydirectinput.keyDown("tab")
-        await asyncio.sleep(0.3)
+            p = pyautogui.position()
+            origin = Point(p.x, p.y)
 
-        for point in points:
-            collect_point = self.collect_mouse_move(point, self._origin)
+            for point in points:
+                correct_point = self.correct_mouse_move(point, origin)
+                correct_point.move_to()
 
-            await self.click_point(collect_point)
-            await self.return_origin()
+                if self.DRY_RUN:
+                    await asyncio.sleep(1)
+                else:
+                    await asyncio.sleep(0.1)
+                    pydirectinput.mouseDown()
+                    await asyncio.sleep(0.05)
+                    pydirectinput.mouseUp()
 
-            result.append(collect_point)
+            origin.move_to()
+            await asyncio.sleep(0.2)
+            pydirectinput.keyUp("tab")
 
-        pydirectinput.keyUp("tab")
+    def correct_mouse_move(self, point: Point, origin: Point) -> Point:
+        MOUSE_MOVE_DIVISOR = 2.0
+        EDGE_SUPPRESSION_FACTOR = 0.2
 
-        return result
+        abs_point = Point(self._window.left, self._window.top) + point
 
-    def draw_debug(self, contours, points: list[Point], result: list[Point], curr_img):
+        half_width = self._window.width / 2  # Maybe screen width / 2 ?
+
+        dist_x = abs(point.x - half_width)
+        norm_x = dist_x / half_width
+        suppression = max(0, 1.0 - (norm_x * EDGE_SUPPRESSION_FACTOR))
+
+        delta = abs_point - origin
+
+        move = origin + Point(
+            x=int(delta.x * suppression / MOUSE_MOVE_DIVISOR),
+            y=int(delta.y / MOUSE_MOVE_DIVISOR),
+        )
+
+        return move
+
+    def draw_debug(self, contours, points: list[Point], curr_img):
         output = curr_img.copy()
 
         for p in points:
@@ -240,83 +339,60 @@ class Image:
                 markerSize=20,
                 thickness=2,
             )
-        for p in result:
-            cv2.drawMarker(
+
+        for c in contours:
+            area = cv2.contourArea(c)
+            cv2.drawContours(output, [c], -1, (0, 255, 0), 2)
+
+            x, y, w, h = cv2.boundingRect(c)
+            text_pos = (x, y - 5 if y - 5 > 0 else y + 15)
+
+            cv2.putText(
                 output,
-                (p.x - self._window.left, p.y - self._window.top),
+                f"{int(area)}",
+                text_pos,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
                 (0, 0, 255),
-                cv2.MARKER_CROSS,
-                markerSize=20,
-                thickness=2,
+                2,
+                cv2.LINE_AA,
             )
 
-        cv2.drawContours(output, contours, -1, (0, 255, 0), 2)
         cv2.imwrite("output.png", output)
 
-    async def run(self):
-        self._task = asyncio.create_task(self.main_loop())
-        self._task2 = asyncio.create_task(self.keyboard_monitor_task())
-        await asyncio.gather(self._task, self._task2)
+    def _load_mask(self, mask_path: Optional[str] = None) -> np.ndarray:
+        if mask_path is None:
+            logging.info("Mask path not provided. Using default mask")
+            return self._create_default_mask()
 
-    async def click_point(self, point: Point):
-        pydirectinput.moveTo(point.x, point.y)
-        await asyncio.sleep(0.1)
-        pydirectinput.mouseDown()
-        await asyncio.sleep(0.05)
-        pydirectinput.mouseUp()
+        mask_gray = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        if mask_gray is None:
+            logging.warning(f"Failed to load mask image. Using default mask")
+            return self._create_default_mask()
 
-    async def return_origin(self):
-        if self._origin is None:
-            return
-        pydirectinput.moveTo(self._origin.x, self._origin.y)
-        await asyncio.sleep(0.1)
+        h, w = mask_gray.shape[:2]
 
-    def check_distance(self, cp: Point, points: list[Point]) -> bool:
-        return any(
-            ((cp.x - point.x) ** 2 + (cp.y - point.y) ** 2) ** 0.5
-            < self.MIN_CLICK_DISTANCE
-            for point in points
-        )
+        if (w, h) != self.WINDOW_SIZE:
+            logging.warning(
+                f"Mask size {w}x{h} does not match WINDOW_SIZE {self.WINDOW_SIZE}. "
+                "Using default mask"
+            )
+            return self._create_default_mask()
 
-    def collect_mouse_move(self, target: Point, origin: Point) -> Point:
-        MOUSE_MOVE_DIVISOR = 2.0
-        EDGE_SUPPRESSION_FACTOR = 0.2
+        _, mask_bin = cv2.threshold(mask_gray, 1, 255, cv2.THRESH_BINARY)
 
-        abs_point = Point(self._window.left + target.x, self._window.top + target.y)
+        logging.info("Mask image load successfully")
+        return mask_bin
 
-        half_width = self._window.width / 2
-
-        dist_x = abs(target.x - half_width)
-        norm_x = dist_x / half_width
-        suppression = max(0, 1.0 - (norm_x * EDGE_SUPPRESSION_FACTOR))
-
-        dx = abs_point.x - origin.x
-        dy = abs_point.y - origin.y
-
-        move_x = int(origin.x + (dx * suppression) / MOUSE_MOVE_DIVISOR)
-        move_y = int(origin.y + dy / 1.9)
-
-        return Point(move_x, move_y)
-
-    def is_ready(self) -> bool:
-        return self._origin is not None and self._window is not None
-
-    async def sleep(self):
-        CLICK_INTERVAL = 0.5
-
-        if not self.is_ready():
-            await asyncio.sleep(self.LOOP_WAIT_TIME)
-            return
-
-        end_time = asyncio.get_event_loop().time() + self.LOOP_WAIT_TIME
-
-        while asyncio.get_event_loop().time() < end_time:
-            pydirectinput.mouseDown()
-            await asyncio.sleep(0.05)
-            pydirectinput.mouseUp()
-
-            await asyncio.sleep(CLICK_INTERVAL)
+    def _create_default_mask(self) -> np.ndarray:
+        w, h = self.WINDOW_SIZE
+        mask = np.zeros((h, w), dtype=np.uint8)
+        mask[h // 2 :, :] = 255
+        return mask
 
 
 if __name__ == "__main__":
-    asyncio.run(Image().run())
+    try:
+        asyncio.run(Image().run())
+    except KeyboardInterrupt:
+        pass
