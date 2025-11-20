@@ -49,7 +49,7 @@ class ContourClickMode(IntEnum):
 
 class Image:
     THRESHOLD_VALUE: Final[int] = 30
-    LOOP_WAIT_TIME: Final[int] = 5
+    LOOP_WAIT_TIME: Final[int] = 3
     MIN_CONTOUR_AREA: Final[int] = 200
     MIN_CLICK_DISTANCE: Final[int] = 20
     MAX_CLICKS_PER_LOOP: Final[int] = 10
@@ -63,6 +63,22 @@ class Image:
     TERMINATE_KEY: Final[str] = "esc"
     SET_WINDOW_KEY: Final[str] = "f5"
     TOGGLE_ENABLE_KEY: Final[str] = "f6"
+
+    @property
+    def running(self) -> bool:
+        return self._running
+
+    @running.setter
+    def running(self, v: bool):
+        if v == self._running:
+            return
+        self._running = v
+        if v:
+            pydirectinput.keyDown("tab")
+            p = pyautogui.position()
+            self._origin = Point(p.x, p.y)
+        else:
+            pydirectinput.keyUp("tab")
 
     def __init__(self, contour_click_mode: ContourClickMode = ContourClickMode.RANDOM):
         self._main_task: asyncio.Task = None
@@ -89,7 +105,7 @@ class Image:
     def terminate(self, _):
         logging.info("ESC pressed: Emergency stop")
 
-        self._running = False
+        self.running = False
 
         if self._main_task:
             self._main_task.cancel()
@@ -97,7 +113,7 @@ class Image:
             self._auto_click_task.cancel()
 
     def set_window(self, _):
-        if self._running:
+        if self.running:
             logging.warning("Ignored set window (now running)")
             return
         window = pygetwindow.getActiveWindow()
@@ -113,16 +129,15 @@ class Image:
         logging.info(f"Window : {window}")
 
     def toggle_run(self, _):
-        if self._running:
-            self._running = False
-            logging.info("Stop")
+        if self.running:
+            self.running = False
             return
 
         if self._window is None:
             logging.warning("Window is not set.")
             return
 
-        self._running = True
+        self.running = True
 
     def restore_window_size(self):
         if self._window is None or self._original_size is None:
@@ -143,9 +158,11 @@ class Image:
     async def main_loop(self):
         try:
             while True:
-                if self._running:
+                if self.running:
                     await self.loop_step()
                     await asyncio.sleep(self.LOOP_WAIT_TIME)
+                else:
+                    await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             pass
         finally:
@@ -157,7 +174,7 @@ class Image:
         try:
             while True:
                 await asyncio.sleep(0.20)
-                if self._running:
+                if self.running:
                     if not self._click_lock.locked():
                         pydirectinput.mouseDown()
                         await asyncio.sleep(0.05)
@@ -181,7 +198,7 @@ class Image:
 
         await self.process_clicks(points)
 
-        self.draw_debug(contours, points, curr_img)
+        # self.draw_debug(contours, points, curr_img)
 
     async def capture_window(self):
         if self._window is None:
@@ -284,14 +301,8 @@ class Image:
 
     async def process_clicks(self, points: list[Point]):
         async with self._click_lock:
-            pydirectinput.keyDown("tab")
-            await asyncio.sleep(0.2)
-
-            p = pyautogui.position()
-            origin = Point(p.x, p.y)
-
             for point in points:
-                correct_point = self.correct_mouse_move(point, origin)
+                correct_point = self.correct_mouse_move(point, self._origin)
                 correct_point.move_to()
 
                 if self.DRY_RUN:
@@ -302,9 +313,7 @@ class Image:
                     await asyncio.sleep(0.05)
                     pydirectinput.mouseUp()
 
-            origin.move_to()
-            await asyncio.sleep(0.2)
-            pydirectinput.keyUp("tab")
+            self._origin.move_to()
 
     def correct_mouse_move(self, point: Point, origin: Point) -> Point:
         MOUSE_MOVE_DIVISOR = 2.0
