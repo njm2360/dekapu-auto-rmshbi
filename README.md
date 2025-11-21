@@ -1,5 +1,8 @@
 # でかプ お部屋シャルベ回収自動化ツール (OpenCV版)
 
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/cd5b0cc4-9b12-412e-86fe-20dc32be67e8" />
+
+
 ## 動作環境
 
 あらかじめ[uv](https://github.com/astral-sh/uv)を導入してPythonをインストールしてください
@@ -24,3 +27,4 @@ VRChatのウィンドウに移動したらF5キーを押すとウィンドウの
 2階のタスクパネルの対角の角に立ったらカーソルをタスク獲得ボタンに合わせてF6を押すと開始です。動作中はマウスカーソルを動かさないでください
 
 F6を再度押すとオンオフの切り替え、ESCキーを押すと緊急停止です(通常終了時もESCキーです)
+
