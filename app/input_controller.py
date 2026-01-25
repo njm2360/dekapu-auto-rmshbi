@@ -1,30 +1,24 @@
 import asyncio
 import pyautogui
 import pydirectinput
-from typing import Optional
+from typing import Final, Optional
 
 from app.window_controroller import WindowController
 from app.point import Point
 
 
 class InputController:
-    def __init__(
-        self,
-        window_controller: WindowController,
-        click_down_delay: float = 0.1,
-        click_up_delay: float = 0.05,
-        mouse_move_divisor: float = 2.0,
-        edge_suppression_factor: float = 0.2,
-    ):
+
+    MOUSE_TAKE_WAIT: Final[float] = 0.10
+    MOVE_AFTR_WAIT: Final[float] = 0.10
+    CLICK_DOWN_WAIT: Final[float] = 0.10
+    MOUSE_MOVE_DIVISOR: Final[float] = 2.0
+    FOV_SUPPRESSION_FACTOR: Final[float] = 0.2
+
+    def __init__(self, window_controller: WindowController):
         self._window_controller = window_controller
 
-        self.click_down_delay = click_down_delay
-        self.click_up_delay = click_up_delay
-
-        self._mouse_move_divisor = mouse_move_divisor
-        self._edge_suppression_factor = edge_suppression_factor
-
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock = asyncio.Lock()
         self._origin: Optional[Point] = None
 
     @property
@@ -46,22 +40,22 @@ class InputController:
                 if dry_run:
                     await asyncio.sleep(1)
                 else:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(self.MOVE_AFTR_WAIT)
                     await self.click()
 
             await self.move_to(self._origin)
 
     async def move_to(self, point: Point):
-        await asyncio.to_thread(pydirectinput.moveTo, point.x, point.y)
+        pydirectinput.moveTo(point.x, point.y)
 
     async def click(self):
-        await asyncio.to_thread(pydirectinput.mouseDown)
-        await asyncio.sleep(self.click_up_delay)
-        await asyncio.to_thread(pydirectinput.mouseUp)
-        await asyncio.sleep(self.click_down_delay)
+        pydirectinput.mouseDown()
+        await asyncio.sleep(self.CLICK_DOWN_WAIT)
+        pydirectinput.mouseUp()
 
-    def perspective_lock(self):
+    async def perspective_lock(self):
         pydirectinput.keyDown("tab")
+        await asyncio.sleep(self.MOUSE_TAKE_WAIT)
         p = pyautogui.position()
         self._origin = Point(p.x, p.y)
 
@@ -78,17 +72,17 @@ class InputController:
 
         abs_point = Point(window.left, window.top) + point
 
-        half_width = window.width / 2
+        half_width = window.width / 2.0
 
         dist_x = abs(point.x - half_width)
         norm_x = dist_x / half_width
-        suppression = max(0.0, 1.0 - (norm_x * self._edge_suppression_factor))
+        suppression = max(0.0, 1.0 - (norm_x * self.FOV_SUPPRESSION_FACTOR))
 
         delta = abs_point - self._origin
 
         move = self._origin + Point(
-            x=int(delta.x * suppression / self._mouse_move_divisor),
-            y=int(delta.y / self._mouse_move_divisor),
+            x=int(delta.x * suppression / self.MOUSE_MOVE_DIVISOR),
+            y=int(delta.y / self.MOUSE_MOVE_DIVISOR),
         )
 
         return move

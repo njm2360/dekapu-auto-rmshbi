@@ -38,6 +38,7 @@ class AutoClickApp:
         self._main_task: Optional[asyncio.Task] = None
         self._auto_click_task: Optional[asyncio.Task] = None
         self._running: bool = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         keyboard.on_press_key(self.TERMINATE_KEY, self.terminate)
         keyboard.on_press_key(self.SET_WINDOW_KEY, self.set_window)
@@ -71,9 +72,14 @@ class AutoClickApp:
             return
 
         self._running = True
-        self.input_ctrl.perspective_lock()
+
+        if self._loop:
+            asyncio.run_coroutine_threadsafe(
+                self.input_ctrl.perspective_lock(), self._loop
+            )
 
     async def run(self):
+        self._loop = asyncio.get_running_loop()
         self._main_task = asyncio.create_task(self.main())
         self._auto_click_task = asyncio.create_task(self.auto_click_loop())
         await asyncio.gather(self._main_task, self._auto_click_task)
