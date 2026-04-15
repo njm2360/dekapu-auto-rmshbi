@@ -36,7 +36,6 @@ class AutoClickApp:
         self.detector = MotionDetector(mask)
 
         self._main_task: Optional[asyncio.Task] = None
-        self._auto_click_task: Optional[asyncio.Task] = None
         self._running: bool = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -51,8 +50,6 @@ class AutoClickApp:
 
         if self._main_task:
             self._main_task.cancel()
-        if self._auto_click_task:
-            self._auto_click_task.cancel()
 
     def set_window(self, _):
         if self._running:
@@ -81,8 +78,7 @@ class AutoClickApp:
     async def run(self):
         self._loop = asyncio.get_running_loop()
         self._main_task = asyncio.create_task(self.main())
-        self._auto_click_task = asyncio.create_task(self.auto_click_loop())
-        await asyncio.gather(self._main_task, self._auto_click_task)
+        await self._main_task
 
     async def main(self):
         try:
@@ -97,16 +93,6 @@ class AutoClickApp:
         finally:
             self.input_ctrl.cleanup()
             self.window_ctrl.restore()
-
-    async def auto_click_loop(self):
-        try:
-            while True:
-                await asyncio.sleep(0.2)
-                if self._running:
-                    if not self.input_ctrl.lock.locked():
-                        await self.input_ctrl.click()
-        except asyncio.CancelledError:
-            pass
 
     async def loop_step(self):
         prev_img, curr_img = await self.capture.capture_pair()
