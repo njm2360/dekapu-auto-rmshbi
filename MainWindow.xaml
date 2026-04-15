@@ -1,0 +1,90 @@
+<Window x:Class="DekapuAutoOpencv.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DekapuAutoOpencv"
+        Width="420" Height="340"
+        MinWidth="320" MinHeight="240"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E">
+
+    <Window.Resources>
+        <Style x:Key="LabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="FontSize"   Value="11"/>
+        </Style>
+        <Style x:Key="ValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#EEEEEE"/>
+            <Setter Property="FontSize"   Value="13"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <!-- Status row -->
+            <RowDefinition Height="Auto"/>
+            <!-- Window info -->
+            <RowDefinition Height="Auto"/>
+            <!-- Separator -->
+            <RowDefinition Height="8"/>
+            <!-- Log area -->
+            <RowDefinition Height="*"/>
+            <!-- Hotkey hints -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Status + 設定ボタン ── -->
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                <Ellipse Width="12" Height="12"
+                         Fill="{Binding StatusColor}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,8,0"/>
+                <TextBlock Text="{Binding StatusText}"
+                           Foreground="#EEEEEE"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+            <Button Content="設定"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Click="OpenSettings_Click"
+                    Background="#2D2D2D"
+                    Foreground="#AAAAAA"
+                    BorderBrush="#444"
+                    Padding="10,3"
+                    FontSize="12"
+                    Cursor="Hand"/>
+        </Grid>
+
+        <!-- ── Window info ── -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal">
+            <TextBlock Text="Window: " Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding WindowTitle}"
+                       Style="{StaticResource ValueStyle}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       MaxWidth="280"/>
+        </StackPanel>
+
+        <!-- ── Log area ── -->
+        <Border Grid.Row="3"
+                Background="#121212"
+                BorderBrush="#333"
+                BorderThickness="1"
+                CornerRadius="4">
+            <ScrollViewer x:Name="LogScroller"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="6,4">
+                <TextBlock x:Name="LogBlock"
+                           Text="{Binding LogText}"
+                           Foreground="#AAAAAA"
+                           FontFamily="Consolas"
+                           FontSize="11"
+                           TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>
