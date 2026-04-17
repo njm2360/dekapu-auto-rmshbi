@@ -195,7 +195,7 @@ internal static class NativeMethods
         SendInput(1, [input], Marshal.SizeOf<INPUT>());
     }
 
-    public static IntPtr InstallKeyboardHook(Action onF5, Action onF6, Action onEsc)
+    public static IntPtr InstallKeyboardHook(Action onSetWindow, Action onStart, Action onStop)
     {
         _hookProc = (nCode, wParam, lParam) =>
         {
@@ -204,9 +204,9 @@ internal static class NativeMethods
                 var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 switch (kb.vkCode)
                 {
-                    case VK_F5: onF5(); break;
-                    case VK_F6: onF6(); break;
-                    case VK_ESCAPE: onEsc(); break;
+                    case VK_F5: onSetWindow(); break;
+                    case VK_F6: onStart(); break;
+                    case VK_ESCAPE: onStop(); break;
                 }
             }
             return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);

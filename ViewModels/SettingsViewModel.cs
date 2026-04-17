@@ -19,8 +19,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial int LoopWaitMs { get; set; }
     [ObservableProperty]
-    public partial int IdleWaitMs { get; set; }
-    [ObservableProperty]
     public partial bool DryRun { get; set; }
 
     // ── 検知設定 ──────────────────────────────────────
@@ -39,7 +37,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial int RandomClicksPerContour { get; set; }
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsMinClickDistanceEnabled))]
     public partial bool EnableAvoidCloseClick { get; set; }
+
+    public bool IsMinClickDistanceEnabled => EnableAvoidCloseClick;
 
     // ── 入力設定 ──────────────────────────────────────
 
@@ -67,7 +68,6 @@ public partial class SettingsViewModel : ObservableObject
         WindowWidth = settings.WindowWidth;
         WindowHeight = settings.WindowHeight;
         LoopWaitMs = settings.LoopWaitMs;
-        IdleWaitMs = settings.IdleWaitMs;
         DryRun = settings.DryRun;
 
         ThresholdValue = settings.ThresholdValue;
@@ -95,7 +95,6 @@ public partial class SettingsViewModel : ObservableObject
         _settings.WindowWidth = WindowWidth;
         _settings.WindowHeight = WindowHeight;
         _settings.LoopWaitMs = LoopWaitMs;
-        _settings.IdleWaitMs = IdleWaitMs;
         _settings.DryRun = DryRun;
 
         _settings.ThresholdValue = ThresholdValue;

@@ -1,4 +1,7 @@
+using System.IO;
+using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DekapuAutoOpencv.Core;
@@ -49,10 +52,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public partial string WindowTitle { get; set; } = "(未設定)";
 
     [ObservableProperty]
-    public partial string LogText { get; set; } = string.Empty;
+    [NotifyPropertyChangedFor(nameof(ThumbnailPlaceholderVisibility))]
+    public partial BitmapSource? ThumbnailImage { get; set; } = null;
 
     public string StatusText => IsRunning ? "実行中" : "停止中";
     public Brush StatusColor => IsRunning ? Brushes.LimeGreen : Brushes.Gray;
+    public Visibility ThumbnailPlaceholderVisibility => ThumbnailImage is null ? Visibility.Visible : Visibility.Collapsed;
 
     public MainViewModel()
     {
@@ -70,67 +75,46 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = Task.Run(() => MainLoopAsync(_cts.Token));
     }
 
-    public void OnF5()
+    public void OnSetWindow()
     {
-        if (_running)
-        {
-            Log("実行中はウィンドウを変更できません");
-            return;
-        }
+        if (_running) return;
 
         if (_windowCtrl.SetWindow())
         {
             _windowCtrl.Resize();
             WindowTitle = NativeMethods.GetWindowTitle(_windowCtrl.Hwnd);
-            Log($"ウィンドウを設定: {WindowTitle}");
-        }
-        else
-        {
-            Log("ウィンドウの設定に失敗しました");
         }
     }
 
-    public void OnF6()
+    public void OnStart()
     {
         if (_running) return;
-
-        if (_windowCtrl.Hwnd == IntPtr.Zero)
-        {
-            Log("ウィンドウが設定されていません");
-            return;
-        }
+        if (_windowCtrl.Hwnd == IntPtr.Zero) return;
 
         _running = true;
         IsRunning = true;
-        Log("開始しました");
 
         _ = Task.Run(() => _inputCtrl.PerspectiveLockAsync());
     }
 
-    public void OnEsc()
+    public void OnStop()
     {
         if (!_running) return;
 
         _running = false;
         IsRunning = false;
-        Log("停止しました");
+        ThumbnailImage = null;
     }
 
     public void OnSettingsSaved((int W, int H) prevSize)
     {
         var newSize = (Settings.WindowWidth, Settings.WindowHeight);
-        if (newSize != prevSize)
-        {
-            _mask.Dispose();
-            _mask = MaskLoader.MakeDefault(newSize);
-            _detector = new MotionDetector(Settings, _mask);
-            _windowCtrl.UpdateTargetSize(newSize);
-            Log($"ウィンドウサイズを {newSize.Item1}×{newSize.Item2} に変更しました");
-        }
-        else
-        {
-            Log("設定を保存しました");
-        }
+        if (newSize == prevSize) return;
+
+        _mask.Dispose();
+        _mask = MaskLoader.MakeDefault(newSize);
+        _detector = new MotionDetector(Settings, _mask);
+        _windowCtrl.UpdateTargetSize(newSize);
     }
 
     // -------------------------------------------------------------------------
@@ -139,19 +123,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task MainLoopAsync(CancellationToken ct)
     {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(Settings.LoopWaitMs));
         try
         {
-            while (!ct.IsCancellationRequested)
+            while (await timer.WaitForNextTickAsync(ct))
             {
                 if (_running)
-                {
                     await LoopStepAsync();
-                    await Task.Delay(Settings.LoopWaitMs, ct);
-                }
-                else
-                {
-                    await Task.Delay(Settings.IdleWaitMs, ct);
-                }
             }
         }
         catch (OperationCanceledException) { }
@@ -172,6 +150,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var contours = _detector.Detect(prev, curr);
             if (contours.Length == 0) return;
 
+            UpdateThumbnail(curr, contours);
+
             var clicks = _extractor.Extract(contours);
             if (clicks.Count == 0) return;
 
@@ -184,28 +164,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Logging (thread-safe)
-    // -------------------------------------------------------------------------
-
-    public void Log(string message)
+    private void UpdateThumbnail(Mat mat, OpenCvSharp.Point[][] contours)
     {
-        var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        const int DisplayWidth = 448;
+        var scale = Math.Min(1.0, (double)DisplayWidth / mat.Width);
+        var size = new OpenCvSharp.Size((int)(mat.Width * scale), (int)(mat.Height * scale));
+
+        using var resized = mat.Resize(size, interpolation: InterpolationFlags.Area);
+
+        var scaledContours = contours
+            .Select(c => c.Select(p => new OpenCvSharp.Point((int)(p.X * scale), (int)(p.Y * scale))).ToArray())
+            .ToArray();
+
+        using var annotated = MotionDetector.Annotate(scaledContours, resized);
+        Cv2.ImEncode(".png", annotated, out var buf);
 
         _dispatcher.BeginInvoke(() =>
         {
-            const int MaxLines = 200;
-            var lines = LogText.Length == 0
-                ? []
-                : LogText.Split('\n');
-
-            var kept = lines.Length >= MaxLines
-                ? lines[(lines.Length - MaxLines + 1)..]
-                : lines;
-
-            LogText = kept.Length == 0
-                ? line
-                : string.Join('\n', kept) + '\n' + line;
+            using var ms = new MemoryStream(buf);
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.StreamSource = ms;
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            ThumbnailImage = bmp;
         });
     }
 

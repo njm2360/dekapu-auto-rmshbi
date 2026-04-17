@@ -6,7 +6,6 @@ public class AppSettings
     public int WindowWidth { get; set; } = 1024;
     public int WindowHeight { get; set; } = 768;
     public int LoopWaitMs { get; set; } = 3000;
-    public int IdleWaitMs { get; set; } = 500;
     public bool DryRun { get; set; } = false;
 
     // ── 検知設定 ──────────────────────────────────────

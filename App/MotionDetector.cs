@@ -40,29 +40,30 @@ public class MotionDetector(AppSettings settings, Mat? mask = null)
         return filtered;
     }
 
-    public void Debug(OcvPoint[][] contours, Mat image)
+    public static Mat Annotate(OcvPoint[][] contours, Mat image)
     {
-        using var output = image.Clone();
+        var output = image.Clone();
 
         foreach (var c in contours)
         {
-            double area = Cv2.ContourArea(c);
-            Cv2.DrawContours(output, new[] { c }, -1, new Scalar(0, 255, 0), 2);
-
             var rect = Cv2.BoundingRect(c);
-            var textPos = new OcvPoint(rect.X, rect.Y > 5 ? rect.Y - 5 : rect.Y + 15);
+            var area = (int)Cv2.ContourArea(c);
 
-            Cv2.PutText(
-                output,
-                $"{(int)area}",
-                textPos,
-                HersheyFonts.HersheySimplex,
-                0.6,
-                new Scalar(0, 0, 255),
-                2,
-                LineTypes.AntiAlias);
+            Cv2.DrawContours(output, [c], -1, new Scalar(0, 255, 0), 2);
+
+            const double fontSize = 0.55;
+            const int fontThickness = 1;
+            var label = $"{area}px ({rect.Width}x{rect.Height})";
+            var textSize = Cv2.GetTextSize(label, HersheyFonts.HersheySimplex, fontSize, fontThickness, out var baseline);
+
+            var textOrg = new OcvPoint(rect.X, rect.Y > textSize.Height + 4 ? rect.Y - 4 : rect.Y + textSize.Height + 4);
+            var bgTl = new OcvPoint(textOrg.X - 1, textOrg.Y - textSize.Height - 1);
+            var bgBr = new OcvPoint(textOrg.X + textSize.Width + 1, textOrg.Y + baseline + 1);
+
+            Cv2.Rectangle(output, bgTl, bgBr, new Scalar(255, 255, 255), -1);
+            Cv2.PutText(output, label, textOrg, HersheyFonts.HersheySimplex, fontSize, new Scalar(0, 0, 0), fontThickness, LineTypes.AntiAlias);
         }
 
-        Cv2.ImWrite("output.png", output);
+        return output;
     }
 }

@@ -15,9 +15,9 @@ public partial class App : Application
         ViewModel = new MainViewModel();
 
         _hookHandle = NativeMethods.InstallKeyboardHook(
-            onF5: ViewModel.OnF5,
-            onF6: ViewModel.OnF6,
-            onEsc: ViewModel.OnEsc);
+            onSetWindow: ViewModel.OnSetWindow,
+            onStart: ViewModel.OnStart,
+            onStop: ViewModel.OnStop);
 
         var window = new MainWindow { DataContext = ViewModel };
         MainWindow = window;

@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Windows;
 using DekapuAutoOpencv.ViewModels;
 
@@ -9,28 +8,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-    }
-
-    protected override void OnContentRendered(EventArgs e)
-    {
-        base.OnContentRendered(e);
-
-        if (DataContext is MainViewModel vm)
-            vm.PropertyChanged += OnViewModelPropertyChanged;
-    }
-
-    protected override void OnClosed(EventArgs e)
-    {
-        if (DataContext is MainViewModel vm)
-            vm.PropertyChanged -= OnViewModelPropertyChanged;
-
-        base.OnClosed(e);
-    }
-
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.LogText))
-            LogScroller.ScrollToEnd();
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
