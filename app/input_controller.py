@@ -16,6 +16,7 @@ class InputController:
     FOV_SUPPRESSION_FACTOR: Final[float] = 0.2
 
     def __init__(self, window_controller: WindowController):
+        pydirectinput.PAUSE = 0
         self._window_controller = window_controller
 
         self._lock: asyncio.Lock = asyncio.Lock()
