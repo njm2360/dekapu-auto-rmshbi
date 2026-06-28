@@ -10,6 +10,9 @@ public class WindowController((int Width, int Height) targetSize)
 
     public IntPtr Hwnd => _hwnd;
 
+    public bool IsForeground =>
+        _hwnd != IntPtr.Zero && NativeMethods.GetForegroundWindow() == _hwnd;
+
     public (int Left, int Top, int Width, int Height)? Region
     {
         get

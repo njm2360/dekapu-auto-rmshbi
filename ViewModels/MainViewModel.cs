@@ -128,8 +128,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
-                if (_running)
-                    await LoopStepAsync();
+                if (!_running) continue;
+
+                if (!_windowCtrl.IsForeground)
+                {
+                    _ = _dispatcher.BeginInvoke(OnStop);
+                    continue;
+                }
+
+                await LoopStepAsync();
             }
         }
         catch (OperationCanceledException) { }
