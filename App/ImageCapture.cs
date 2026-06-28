@@ -1,12 +1,13 @@
 using System.Drawing;
+using DekapuAutoOpencv.Models;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 
 namespace DekapuAutoOpencv.Core;
 
-public class ImageCapture(WindowController windowController)
+public class ImageCapture(WindowController windowController, AppSettings settings)
 {
-    public async Task<(Mat? Prev, Mat? Curr)> CapturePairAsync(double delay = 0.1)
+    public async Task<(Mat? Prev, Mat? Curr)> CapturePairAsync()
     {
         var region = windowController.Region;
         if (region is null)
@@ -18,7 +19,7 @@ public class ImageCapture(WindowController windowController)
         try
         {
             var img1 = await Task.Run(() => Shot(region.Value));
-            await Task.Delay(TimeSpan.FromSeconds(delay));
+            await Task.Delay(settings.DiffCaptureWaitMs);
             var img2 = await Task.Run(() => Shot(region.Value));
             return (img1, img2);
         }

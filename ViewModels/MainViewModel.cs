@@ -69,7 +69,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         _windowCtrl = new WindowController((Settings.WindowWidth, Settings.WindowHeight));
         _inputCtrl = new InputController(_windowCtrl, Settings);
-        _capture = new ImageCapture(_windowCtrl);
+        _capture = new ImageCapture(_windowCtrl, Settings);
         _extractor = new ClickPointExtractor(Settings);
         _mask = MaskLoader.MakeDefault((Settings.WindowWidth, Settings.WindowHeight));
         _detector = new MotionDetector(Settings, _mask);

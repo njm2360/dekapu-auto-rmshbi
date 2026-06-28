@@ -6,6 +6,7 @@ public class AppSettings
     public int WindowWidth { get; set; } = 1024;
     public int WindowHeight { get; set; } = 768;
     public int LoopWaitMs { get; set; } = 3000;
+    public int DiffCaptureWaitMs { get; set; } = 100;
     public bool DryRun { get; set; } = false;
 
     // ── 検知設定 ──────────────────────────────────────
@@ -20,7 +21,6 @@ public class AppSettings
     public bool EnableAvoidCloseClick { get; set; } = true;
 
     // ── 入力設定 ──────────────────────────────────────
-    public int MouseTakeWaitMs { get; set; } = 100;
     public int MoveAfterWaitMs { get; set; } = 100;
     public int ClickDownWaitMs { get; set; } = 100;
     public double MouseMoveDivisor { get; set; } = 2.0;

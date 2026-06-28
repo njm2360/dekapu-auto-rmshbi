@@ -19,6 +19,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     public partial int LoopWaitMs { get; set; }
     [ObservableProperty]
+    public partial int DiffCaptureWaitMs { get; set; }
+    [ObservableProperty]
     public partial bool DryRun { get; set; }
 
     // ── 検知設定 ──────────────────────────────────────
@@ -45,8 +47,6 @@ public partial class SettingsViewModel : ObservableObject
     // ── 入力設定 ──────────────────────────────────────
 
     [ObservableProperty]
-    public partial int MouseTakeWaitMs { get; set; }
-    [ObservableProperty]
     public partial int MoveAfterWaitMs { get; set; }
     [ObservableProperty]
     public partial int ClickDownWaitMs { get; set; }
@@ -68,6 +68,7 @@ public partial class SettingsViewModel : ObservableObject
         WindowWidth = settings.WindowWidth;
         WindowHeight = settings.WindowHeight;
         LoopWaitMs = settings.LoopWaitMs;
+        DiffCaptureWaitMs = settings.DiffCaptureWaitMs;
         DryRun = settings.DryRun;
 
         ThresholdValue = settings.ThresholdValue;
@@ -79,7 +80,6 @@ public partial class SettingsViewModel : ObservableObject
         RandomClicksPerContour = settings.RandomClicksPerContour;
         EnableAvoidCloseClick = settings.EnableAvoidCloseClick;
 
-        MouseTakeWaitMs = settings.MouseTakeWaitMs;
         MoveAfterWaitMs = settings.MoveAfterWaitMs;
         ClickDownWaitMs = settings.ClickDownWaitMs;
         MouseMoveDivisor = settings.MouseMoveDivisor;
@@ -95,6 +95,7 @@ public partial class SettingsViewModel : ObservableObject
         _settings.WindowWidth = WindowWidth;
         _settings.WindowHeight = WindowHeight;
         _settings.LoopWaitMs = LoopWaitMs;
+        _settings.DiffCaptureWaitMs = DiffCaptureWaitMs;
         _settings.DryRun = DryRun;
 
         _settings.ThresholdValue = ThresholdValue;
@@ -106,7 +107,6 @@ public partial class SettingsViewModel : ObservableObject
         _settings.RandomClicksPerContour = RandomClicksPerContour;
         _settings.EnableAvoidCloseClick = EnableAvoidCloseClick;
 
-        _settings.MouseTakeWaitMs = MouseTakeWaitMs;
         _settings.MoveAfterWaitMs = MoveAfterWaitMs;
         _settings.ClickDownWaitMs = ClickDownWaitMs;
         _settings.MouseMoveDivisor = MouseMoveDivisor;
