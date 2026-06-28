@@ -104,6 +104,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _running = false;
         IsRunning = false;
         ThumbnailImage = null;
+
+        _inputCtrl.Cleanup();
     }
 
     public void OnSettingsSaved((int W, int H) prevSize)
@@ -206,6 +208,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _cts.Cancel();
+        _inputCtrl.Cleanup();
+        _windowCtrl.Restore();
         _mask.Dispose();
         _cts.Dispose();
     }
