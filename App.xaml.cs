@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using DekapuAutoOpencv.ViewModels;
 
 namespace DekapuAutoOpencv;
@@ -10,6 +12,8 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
+        RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+
         NativeMethods.SetProcessDPIAware();
 
         ViewModel = new MainViewModel();
