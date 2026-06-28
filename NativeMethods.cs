@@ -14,10 +14,10 @@ internal static class NativeMethods
 
     private const int WM_KEYDOWN = 0x0100;
 
-    public const ushort VK_TAB = 0x09;
-    public const ushort VK_F5 = 0x74;
-    public const ushort VK_F6 = 0x75;
-    public const ushort VK_ESCAPE = 0x1B;
+    public const ushort PerspectiveLockKey = 0x09; // Tab
+    private const ushort SetWindowKey = 0x76;       // F7
+    private const ushort StartKey = 0x77;           // F8
+    private const ushort StopKey = 0x1B;            // Esc
 
     private const uint INPUT_MOUSE = 0;
     private const uint INPUT_KEYBOARD = 1;
@@ -243,9 +243,9 @@ internal static class NativeMethods
                 var kb = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
                 switch (kb.vkCode)
                 {
-                    case VK_F5: onSetWindow(); break;
-                    case VK_F6: onStart(); break;
-                    case VK_ESCAPE: onStop(); break;
+                    case SetWindowKey: onSetWindow(); break;
+                    case StartKey: onStart(); break;
+                    case StopKey: onStop(); break;
                 }
             }
             return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);

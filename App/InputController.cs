@@ -49,7 +49,7 @@ public class InputController(WindowController windowController, AppSettings sett
         var (cx, cy) = windowController.ClientCenter
             ?? throw new InvalidOperationException("Window is not set");
 
-        NativeMethods.SendKey(NativeMethods.VK_TAB, keyUp: false);
+        NativeMethods.SendKey(NativeMethods.PerspectiveLockKey, keyUp: false);
 
         _origin = new Point(cx, cy);
     }
@@ -57,7 +57,7 @@ public class InputController(WindowController windowController, AppSettings sett
     public static void Cleanup()
     {
         NativeMethods.SendMouseButton(isDown: false);
-        NativeMethods.SendKey(NativeMethods.VK_TAB, keyUp: true);
+        NativeMethods.SendKey(NativeMethods.PerspectiveLockKey, keyUp: true);
     }
 
     public Point Correct(Point point)
