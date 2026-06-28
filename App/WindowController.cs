@@ -23,6 +23,9 @@ public class WindowController((int Width, int Height) targetSize)
         }
     }
 
+    public (int X, int Y)? ClientCenter =>
+        _hwnd == IntPtr.Zero ? null : NativeMethods.GetClientCenter(_hwnd);
+
     public bool SetWindow()
     {
         Restore();

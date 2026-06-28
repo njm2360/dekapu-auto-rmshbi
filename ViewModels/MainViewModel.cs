@@ -46,6 +46,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(StatusColor))]
+    [NotifyPropertyChangedFor(nameof(IsSettingsEnabled))]
     public partial bool IsRunning { get; set; } = false;
 
     [ObservableProperty]
@@ -57,6 +58,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public string StatusText => IsRunning ? "実行中" : "停止中";
     public Brush StatusColor => IsRunning ? Brushes.LimeGreen : Brushes.Gray;
+    public bool IsSettingsEnabled => !IsRunning;
     public Visibility ThumbnailPlaceholderVisibility => ThumbnailImage is null ? Visibility.Visible : Visibility.Collapsed;
 
     public MainViewModel()
@@ -105,7 +107,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsRunning = false;
         ThumbnailImage = null;
 
-        _inputCtrl.Cleanup();
+        InputController.Cleanup();
     }
 
     public void OnSettingsSaved((int W, int H) prevSize)
@@ -144,7 +146,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         catch (OperationCanceledException) { }
         finally
         {
-            _inputCtrl.Cleanup();
+            InputController.Cleanup();
             _windowCtrl.Restore();
         }
     }
@@ -208,7 +210,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _cts.Cancel();
-        _inputCtrl.Cleanup();
+        InputController.Cleanup();
         _windowCtrl.Restore();
         _mask.Dispose();
         _cts.Dispose();

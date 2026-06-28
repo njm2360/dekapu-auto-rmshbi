@@ -100,6 +100,12 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hWnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
 
@@ -159,6 +165,14 @@ internal static class NativeMethods
     {
         GetCursorPos(out var p);
         return (p.X, p.Y);
+    }
+
+    public static (int X, int Y) GetClientCenter(IntPtr hwnd)
+    {
+        GetClientRect(hwnd, out var rc);
+        var center = new POINT { X = (rc.Right - rc.Left) / 2, Y = (rc.Bottom - rc.Top) / 2 };
+        ClientToScreen(hwnd, ref center);
+        return (center.X, center.Y);
     }
 
     public static RECT GetVisibleRect(IntPtr hwnd)

@@ -44,13 +44,15 @@ public class InputController(WindowController windowController, AppSettings sett
 
     public async Task PerspectiveLockAsync()
     {
+        var (cx, cy) = windowController.ClientCenter
+            ?? throw new InvalidOperationException("Window is not set");
+
         NativeMethods.SendKey(NativeMethods.VK_TAB, keyUp: false);
-        await Task.Delay(settings.MouseTakeWaitMs);
-        var (x, y) = NativeMethods.GetCursorPosition();
-        _origin = new Point(x, y);
+
+        _origin = new Point(cx, cy);
     }
 
-    public void Cleanup()
+    public static void Cleanup()
     {
         NativeMethods.SendMouseButton(isDown: false);
         NativeMethods.SendKey(NativeMethods.VK_TAB, keyUp: true);

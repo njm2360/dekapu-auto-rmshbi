@@ -16,7 +16,7 @@ public partial class MainWindow : Window
         var settingsVm = new SettingsViewModel(
             mainVm.Settings,
             mainVm.SettingsService,
-            prevSize => mainVm.OnSettingsSaved(prevSize));
+            mainVm.OnSettingsSaved);
 
         new SettingsWindow { DataContext = settingsVm, Owner = this }.ShowDialog();
     }
