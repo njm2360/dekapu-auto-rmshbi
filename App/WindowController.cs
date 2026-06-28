@@ -18,7 +18,7 @@ public class WindowController((int Width, int Height) targetSize)
         get
         {
             if (_hwnd == IntPtr.Zero) return null;
-            NativeMethods.GetWindowRect(_hwnd, out var r);
+            var r = NativeMethods.GetVisibleRect(_hwnd);
             return (r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
         }
     }
@@ -52,9 +52,13 @@ public class WindowController((int Width, int Height) targetSize)
     {
         if (_hwnd == IntPtr.Zero) return false;
 
-        NativeMethods.GetWindowRect(_hwnd, out var r);
-        bool ok = NativeMethods.MoveWindow(_hwnd, r.Left, r.Top,
-            _targetSize.Width, _targetSize.Height, true);
+        NativeMethods.GetWindowRect(_hwnd, out var outer);
+        var visible = NativeMethods.GetVisibleRect(_hwnd);
+        int borderX = outer.Right - outer.Left - (visible.Right - visible.Left);
+        int borderY = outer.Bottom - outer.Top - (visible.Bottom - visible.Top);
+
+        bool ok = NativeMethods.MoveWindow(_hwnd, outer.Left, outer.Top,
+            _targetSize.Width + borderX, _targetSize.Height + borderY, true);
 
         if (!ok)
             Console.WriteLine("Resize failed.");

@@ -34,6 +34,7 @@ internal static class NativeMethods
     private const int SM_CYVIRTUALSCREEN = 79;
     private const int SM_XVIRTUALSCREEN = 76;
     private const int SM_YVIRTUALSCREEN = 77;
+    private const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
     // -------------------------------------------------------------------------
     // Structs
@@ -99,6 +100,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
     [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
@@ -157,9 +161,21 @@ internal static class NativeMethods
         return (p.X, p.Y);
     }
 
+    public static RECT GetVisibleRect(IntPtr hwnd)
+    {
+        if (DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS,
+                out var bounds, Marshal.SizeOf<RECT>()) == 0) // S_OK
+        {
+            return bounds;
+        }
+
+        GetWindowRect(hwnd, out var fallback);
+        return fallback;
+    }
+
     public static bool IsWindowOwnedByCurrentProcess(IntPtr hwnd)
     {
-        GetWindowThreadProcessId(hwnd, out var pid);
+        _ = GetWindowThreadProcessId(hwnd, out var pid);
         return pid == (uint)Environment.ProcessId;
     }
 
@@ -168,7 +184,7 @@ internal static class NativeMethods
         int len = GetWindowTextLength(hwnd);
         if (len == 0) return string.Empty;
         var sb = new StringBuilder(len + 1);
-        GetWindowText(hwnd, sb, sb.Capacity);
+        _ = GetWindowText(hwnd, sb, sb.Capacity);
         return sb.ToString();
     }
 
@@ -186,14 +202,14 @@ internal static class NativeMethods
         input.mi.dx = normX;
         input.mi.dy = normY;
         input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
-        SendInput(1, [input], Marshal.SizeOf<INPUT>());
+        _ = SendInput(1, [input], Marshal.SizeOf<INPUT>());
     }
 
     public static void SendMouseButton(bool isDown)
     {
         var input = new INPUT { type = INPUT_MOUSE };
         input.mi.dwFlags = isDown ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP;
-        SendInput(1, [input], Marshal.SizeOf<INPUT>());
+        _ = SendInput(1, [input], Marshal.SizeOf<INPUT>());
     }
 
     public static void SendKey(ushort vk, bool keyUp)
@@ -201,7 +217,7 @@ internal static class NativeMethods
         var input = new INPUT { type = INPUT_KEYBOARD };
         input.ki.wVk = vk;
         input.ki.dwFlags = keyUp ? KEYEVENTF_KEYUP : 0u;
-        SendInput(1, [input], Marshal.SizeOf<INPUT>());
+        _ = SendInput(1, [input], Marshal.SizeOf<INPUT>());
     }
 
     public static IntPtr InstallKeyboardHook(Action onSetWindow, Action onStart, Action onStop)

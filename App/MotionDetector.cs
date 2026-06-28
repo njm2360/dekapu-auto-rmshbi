@@ -20,7 +20,12 @@ public class MotionDetector(AppSettings settings, Mat? mask = null)
         Cv2.Dilate(thresh, dilated, null, iterations: settings.DilateIterations);
 
         if (mask != null)
+        {
+            if (mask.Size() != dilated.Size())
+                Cv2.Resize(mask, mask, dilated.Size(), 0, 0, InterpolationFlags.Nearest);
+
             Cv2.BitwiseAnd(dilated, mask, dilated);
+        }
 
         Cv2.FindContours(
             dilated,
