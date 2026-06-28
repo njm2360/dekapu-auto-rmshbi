@@ -7,7 +7,7 @@ public class InputController(WindowController windowController, AppSettings sett
     private readonly SemaphoreSlim _lock = new(1, 1);
     private Point? _origin;
 
-    public async Task ExecuteClicksAsync(IReadOnlyList<Point> points, bool dryRun = false)
+    public async Task ExecuteClicksAsync(IReadOnlyList<Point> points, bool dryRun = false, CancellationToken ct = default)
     {
         if (_origin is null)
             throw new InvalidOperationException("Origin is not set");
@@ -16,21 +16,23 @@ public class InputController(WindowController windowController, AppSettings sett
 
         var corrected = points.Select(Correct).ToList();
 
-        await _lock.WaitAsync();
+        await _lock.WaitAsync(ct);
         try
         {
             foreach (var point in corrected)
             {
+                ct.ThrowIfCancellationRequested();
+
                 MoveMouseTo(point);
 
                 if (dryRun)
                 {
-                    await Task.Delay(1000);
+                    await Task.Delay(1000, ct);
                 }
                 else
                 {
-                    await Task.Delay(settings.MoveAfterWaitMs);
-                    await ClickAsync();
+                    await Task.Delay(settings.MoveAfterWaitMs, ct);
+                    await ClickAsync(ct);
                 }
             }
 
@@ -80,11 +82,17 @@ public class InputController(WindowController windowController, AppSettings sett
             (int)(delta.Y / settings.MouseMoveDivisor));
     }
 
-    private async Task ClickAsync()
+    private async Task ClickAsync(CancellationToken ct)
     {
         NativeMethods.SendMouseButton(isDown: true);
-        await Task.Delay(settings.ClickDownWaitMs);
-        NativeMethods.SendMouseButton(isDown: false);
+        try
+        {
+            await Task.Delay(settings.ClickDownWaitMs, ct);
+        }
+        finally
+        {
+            NativeMethods.SendMouseButton(isDown: false);
+        }
     }
 
     private static void MoveMouseTo(Point p) =>

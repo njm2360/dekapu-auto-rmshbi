@@ -37,6 +37,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private readonly Dispatcher _dispatcher;
     private CancellationTokenSource _cts = new();
+    private CancellationTokenSource? _runCts;
     private volatile bool _running = false;
 
     // -------------------------------------------------------------------------
@@ -93,6 +94,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (_running) return;
         if (_windowCtrl.Hwnd == IntPtr.Zero) return;
 
+        _runCts?.Dispose();
+        _runCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+
         _running = true;
         IsRunning = true;
 
@@ -107,6 +111,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsRunning = false;
         ThumbnailImage = null;
 
+        _runCts?.Cancel();
         InputController.Cleanup();
     }
 
@@ -140,7 +145,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     continue;
                 }
 
-                await LoopStepAsync();
+                try
+                {
+                    await LoopStepAsync(_runCts?.Token ?? ct);
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                { }
             }
         }
         catch (OperationCanceledException) { }
@@ -151,7 +161,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task LoopStepAsync()
+    private async Task LoopStepAsync(CancellationToken ct)
     {
         var (prev, curr) = await _capture.CapturePairAsync();
         if (prev is null || curr is null) return;
@@ -166,7 +176,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             var clicks = _extractor.Extract(contours);
             if (clicks.Count == 0) return;
 
-            await _inputCtrl.ExecuteClicksAsync(clicks, Settings.DryRun);
+            await _inputCtrl.ExecuteClicksAsync(clicks, Settings.DryRun, ct);
         }
         finally
         {
@@ -213,6 +223,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         InputController.Cleanup();
         _windowCtrl.Restore();
         _mask.Dispose();
+        _runCts?.Dispose();
         _cts.Dispose();
     }
 }
