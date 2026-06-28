@@ -102,6 +102,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
     [DllImport("user32.dll")]
     public static extern int GetWindowTextLength(IntPtr hWnd);
 
@@ -152,6 +155,12 @@ internal static class NativeMethods
     {
         GetCursorPos(out var p);
         return (p.X, p.Y);
+    }
+
+    public static bool IsWindowOwnedByCurrentProcess(IntPtr hwnd)
+    {
+        GetWindowThreadProcessId(hwnd, out var pid);
+        return pid == (uint)Environment.ProcessId;
     }
 
     public static string GetWindowTitle(IntPtr hwnd)

@@ -31,6 +31,12 @@ public class WindowController((int Width, int Height) targetSize)
             return false;
         }
 
+        if (NativeMethods.IsWindowOwnedByCurrentProcess(hwnd))
+        {
+            Console.WriteLine("Cannot set own window as target.");
+            return false;
+        }
+
         NativeMethods.GetWindowRect(hwnd, out var r);
         _hwnd = hwnd;
         _originalSize = (r.Right - r.Left, r.Bottom - r.Top);
