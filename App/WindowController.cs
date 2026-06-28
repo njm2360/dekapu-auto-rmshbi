@@ -28,8 +28,6 @@ public class WindowController((int Width, int Height) targetSize)
 
     public bool SetWindow()
     {
-        Restore();
-
         var hwnd = NativeMethods.GetForegroundWindow();
         if (hwnd == IntPtr.Zero)
         {
@@ -42,6 +40,11 @@ public class WindowController((int Width, int Height) targetSize)
             Console.WriteLine("Cannot set own window as target.");
             return false;
         }
+
+        if (hwnd == _hwnd)
+            return true;
+
+        Restore();
 
         NativeMethods.GetWindowRect(hwnd, out var r);
         _hwnd = hwnd;

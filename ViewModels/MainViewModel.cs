@@ -105,14 +105,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public void OnStop()
     {
-        if (!_running) return;
+        if (_running)
+        {
+            _running = false;
+            IsRunning = false;
+            ThumbnailImage = null;
 
-        _running = false;
-        IsRunning = false;
-        ThumbnailImage = null;
+            _runCts?.Cancel();
+            InputController.Cleanup();
+        }
 
-        _runCts?.Cancel();
-        InputController.Cleanup();
+        _windowCtrl.Restore();
+        WindowTitle = "(未設定)";
     }
 
     public void OnSettingsSaved((int W, int H) prevSize)
